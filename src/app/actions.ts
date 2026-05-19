@@ -12,6 +12,7 @@ import {
 } from "@/lib/forms";
 import { getViewerContext, hasAnySubjects } from "@/lib/data";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { SUPABASE_CONFIG_ERROR, isSupabaseConfigured } from "@/lib/supabase/env";
 import type { FormState, PlannerChoice } from "@/lib/types";
 
 function withMessage(path: string, key: "notice" | "error", message: string) {
@@ -39,6 +40,7 @@ function getAuthFailureMessage(error: unknown, fallback: string) {
 export async function signUpAction(_state: FormState, formData: FormData): Promise<FormState> {
   const parsed = readSignUpDetails(formData);
   if ("error" in parsed) return parsed.error;
+  if (!isSupabaseConfigured()) return { error: SUPABASE_CONFIG_ERROR };
 
   const supabase = await createSupabaseServerClient();
   let data;
@@ -81,6 +83,7 @@ export async function signUpAction(_state: FormState, formData: FormData): Promi
 export async function signInAction(_state: FormState, formData: FormData): Promise<FormState> {
   const parsed = readLoginCredentials(formData);
   if ("error" in parsed) return parsed.error;
+  if (!isSupabaseConfigured()) return { error: SUPABASE_CONFIG_ERROR };
 
   const supabase = await createSupabaseServerClient();
   let error;
