@@ -24,24 +24,48 @@ function getPlannerChoiceKey(choice: Pick<PlannerChoice, "scopeType" | "particip
   return [choice.scopeType, choice.participantUserId ?? "all", choice.subjectCode, choice.activity].join(":");
 }
 
+function getAuthFailureMessage(error: unknown, fallback: string) {
+  if (error instanceof Error) {
+    if (/fetch failed/i.test(error.message)) {
+      return "We could not reach the authentication service. Please try again in a moment.";
+    }
+
+    return error.message || fallback;
+  }
+
+  return fallback;
+}
+
 export async function signUpAction(_state: FormState, formData: FormData): Promise<FormState> {
   const parsed = readSignUpDetails(formData);
   if ("error" in parsed) return parsed.error;
 
   const supabase = await createSupabaseServerClient();
+  let data;
+  let error;
 
-  const { data, error } = await supabase.auth.signUp({
-    email: parsed.data.email,
-    password: parsed.data.password,
-    options: {
-      data: {
-        username: parsed.data.zid,
-        full_name: parsed.data.fullName,
-        zid: parsed.data.zid,
-        unsw_email: parsed.data.email,
+  try {
+    const result = await supabase.auth.signUp({
+      email: parsed.data.email,
+      password: parsed.data.password,
+      options: {
+        data: {
+          username: parsed.data.zid,
+          full_name: parsed.data.fullName,
+          zid: parsed.data.zid,
+          unsw_email: parsed.data.email,
+        },
       },
-    },
-  });
+    });
+
+    data = result.data;
+    error = result.error;
+  } catch (caughtError) {
+    console.error("Supabase sign up request failed.", caughtError);
+    return {
+      error: getAuthFailureMessage(caughtError, "Unable to create account right now."),
+    };
+  }
 
   if (error) {
     return { error: error.message };
@@ -59,10 +83,21 @@ export async function signInAction(_state: FormState, formData: FormData): Promi
   if ("error" in parsed) return parsed.error;
 
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase.auth.signInWithPassword({
-    email: parsed.data.email,
-    password: parsed.data.password,
-  });
+  let error;
+
+  try {
+    const result = await supabase.auth.signInWithPassword({
+      email: parsed.data.email,
+      password: parsed.data.password,
+    });
+
+    error = result.error;
+  } catch (caughtError) {
+    console.error("Supabase sign in request failed.", caughtError);
+    return {
+      error: getAuthFailureMessage(caughtError, "Could not start your session."),
+    };
+  }
 
   if (error) {
     return { error: "UNSW email or password was incorrect." };
